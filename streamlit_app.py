@@ -3,19 +3,20 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import requests
 
-# --- CONFIG ---
-# This pulls from your 'Secrets' in Streamlit Cloud
+# --- 1. CONFIG & SECRETS ---
+# Ensure these match what you pasted into the Streamlit Cloud "Secrets" box
 TMDB_TOKEN = st.secrets["tmdb"]["token"]
 SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
 HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
 
 st.set_page_config(page_title="BingeTracker Elite", page_icon="📺", layout="wide")
 
-# Connect to Google Sheets
+# --- 2. GOOGLE SHEETS CONNECTION ---
+# ttl=0 ensures the app always checks for the newest data
 conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
 
 def get_streaming_service(show_id):
-    """Fetches where the show is streaming in the US."""
+    """Fetches where the show is streaming (US region)."""
     url = f"https://api.themoviedb.org/3/tv/{show_id}/watch/providers"
     try:
         res = requests.get(url, headers=HEADERS).json()
@@ -25,7 +26,7 @@ def get_streaming_service(show_id):
         return "Unknown"
 
 def fetch_show_data(query):
-    """Searches TMDB for show details."""
+    """Searches TMDB for show details and metadata."""
     url = f"https://api.themoviedb.org/3/search/tv?query={query}"
     res = requests.get(url, headers=HEADERS).json()
     if res.get('results'):
@@ -39,13 +40,13 @@ def fetch_show_data(query):
         }
     return None
 
-# --- APP UI ---
+# --- 3. APP UI ---
 st.title("📺 My iPad Watchlist")
 
-# Load data from Google Sheets
-df = conn.read(spreadsheet=SHEET_URL, ttl=0)
+# Load existing data from Google Sheets
+df = conn.read(spreadsheet=SHEET_URL)
 
-# --- SIDEBAR: SEARCH & ADD ---
+# --- 4. SIDEBAR: SEARCH & ADD ---
 with st.sidebar:
     st.header("🔍 Find a New Show")
     search_query = st.text_input("Type show name...")
@@ -64,60 +65,48 @@ with st.sidebar:
                     "Summary": data['summary'],
                     "Poster": data['poster']
                 }])
+                # Combine old data with new row and save to Google Sheets
                 df = pd.concat([df, new_row], ignore_index=True)
                 conn.update(spreadsheet=SHEET_URL, data=df)
-                st.success("Added! Refreshing...")
+                st.success(f"Added {data['name']}!")
                 st.rerun()
 
-# --- MAIN VIEW: ONE SHOW PER ROW ---
+# --- 5. MAIN VIEW: THE VERTICAL LIST ---
 st.divider()
 
 if df.empty or len(df) == 0:
     st.info("Your list is empty! Use the sidebar to search for a show.")
 else:
-    # Ensure numbers are clean
+    # Clean up numbers to prevent decimals/float errors
     df['Season'] = pd.to_numeric(df['Season']).fillna(1).astype(int)
     df['Episode'] = pd.to_numeric(df['Episode']).fillna(1).astype(int)
 
-    # Loop through each show and give it its own row
+    # Loop through each show - Note the indentation here!
     for index, row in df.iterrows():
-        # Create two columns: one for the poster, one for the info/controls
-        # The [1, 3] ratio makes the poster smaller and the controls wider
-        for index, row in df.iterrows():
-        # Changing [1, 3] to [0.5, 4] makes the poster much smaller
+        # Create a narrow column for image and wide column for info
         col_img, col_info = st.columns([0.5, 4])
         
         with col_img:
             if pd.notna(row['Poster']):
-                # We add a bit of padding/width control here
-                st.image(row['Poster'], width=100) 
+                st.image(row['Poster'], width=100)
         
         with col_info:
             st.subheader(row['Show Name'])
-            # The rest of your info/buttons code stays exactly the same...
-        
-        with col_img:
-            if pd.notna(row['Poster']):
-                st.image(row['Poster'], use_container_width=True)
-        
-        with col_info:
-            st.subheader(row['Show Name'])
-            st.write(f"**📍 Streaming on:** {row['Service']}")
+            st.write(f"📍 **Streaming on:** {row['Service']}")
             
-            # Create a sub-row for the input boxes so they sit side-by-side
+            # Create a horizontal row for the inputs and button
             c1, c2, c3 = st.columns([1, 1, 1])
             new_s = c1.number_input("Season", value=int(row['Season']), key=f"s{index}", step=1)
             new_e = c2.number_input("Episode", value=int(row['Episode']), key=f"e{index}", step=1)
             
-            # The update button
             if c3.button("Update Progress", key=f"btn{index}"):
                 df.at[index, 'Season'] = new_s
                 df.at[index, 'Episode'] = new_e
                 conn.update(spreadsheet=SHEET_URL, data=df)
-                st.toast(f"Updated {row['Show Name']}!")
+                st.toast(f"Saved {row['Show Name']}!")
             
-            # Optional: Add the summary toggle
-            with st.expander("See Summary"):
+            # Summary dropdown to keep it clean
+            with st.expander("Show Description"):
                 st.write(row['Summary'])
         
-        st.divider() # Adds a thin line between shows
+        st.divider()
