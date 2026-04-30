@@ -83,7 +83,18 @@ else:
     for index, row in df.iterrows():
         # Create two columns: one for the poster, one for the info/controls
         # The [1, 3] ratio makes the poster smaller and the controls wider
-        col_img, col_info = st.columns([1, 3])
+        for index, row in df.iterrows():
+        # Changing [1, 3] to [0.5, 4] makes the poster much smaller
+        col_img, col_info = st.columns([0.5, 4])
+        
+        with col_img:
+            if pd.notna(row['Poster']):
+                # We add a bit of padding/width control here
+                st.image(row['Poster'], width=100) 
+        
+        with col_info:
+            st.subheader(row['Show Name'])
+            # The rest of your info/buttons code stays exactly the same...
         
         with col_img:
             if pd.notna(row['Poster']):
