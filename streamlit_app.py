@@ -6,7 +6,7 @@ import requests
 # --- CONFIG ---
 TMDB_TOKEN = "YOUR_TMDB_READ_ACCESS_TOKEN"
 HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
-SHEET_URL = "YOUR_GOOGLE_SHEET_URL"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1LEoZ_C61NQz7HrnGn5uZ5ofpYDNUH0kLAaULVtY1O3I/"
 
 st.set_page_config(page_title="BingeTracker Elite", page_icon="📺", layout="wide")
 
