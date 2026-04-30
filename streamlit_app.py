@@ -69,36 +69,44 @@ with st.sidebar:
                 st.success("Added! Refreshing...")
                 st.rerun()
 
-# --- MAIN VIEW: YOUR SHOW TILES ---
+# --- MAIN VIEW: ONE SHOW PER ROW ---
 st.divider()
 
 if df.empty or len(df) == 0:
     st.info("Your list is empty! Use the sidebar to search for a show.")
 else:
-    # Ensure numbers are clean (fixes the float64 error)
+    # Ensure numbers are clean
     df['Season'] = pd.to_numeric(df['Season']).fillna(1).astype(int)
     df['Episode'] = pd.to_numeric(df['Episode']).fillna(1).astype(int)
 
-    # Create a grid (4 shows per row)
-    for i in range(0, len(df), 4):
-        cols = st.columns(4)
-        for j, col in enumerate(cols):
-            if i + j < len(df):
-                row = df.iloc[i + j]
-                with col:
-                    # Poster
-                    if pd.notna(row['Poster']):
-                        st.image(row['Poster'], use_container_width=True)
-                    
-                    st.subheader(row['Show Name'])
-                    st.caption(f"📍 {row['Service']}")
-                    
-                    # Trackers
-                    new_s = st.number_input("Season", value=int(row['Season']), key=f"s{i+j}", step=1)
-                    new_e = st.number_input("Episode", value=int(row['Episode']), key=f"e{i+j}", step=1)
-                    
-                    if st.button("Update Progress", key=f"btn{i+j}"):
-                        df.at[i+j, 'Season'] = new_s
-                        df.at[i+j, 'Episode'] = new_e
-                        conn.update(spreadsheet=SHEET_URL, data=df)
-                        st.toast(f"Saved {row['Show Name']}!")
+    # Loop through each show and give it its own row
+    for index, row in df.iterrows():
+        # Create two columns: one for the poster, one for the info/controls
+        # The [1, 3] ratio makes the poster smaller and the controls wider
+        col_img, col_info = st.columns([1, 3])
+        
+        with col_img:
+            if pd.notna(row['Poster']):
+                st.image(row['Poster'], use_container_width=True)
+        
+        with col_info:
+            st.subheader(row['Show Name'])
+            st.write(f"**📍 Streaming on:** {row['Service']}")
+            
+            # Create a sub-row for the input boxes so they sit side-by-side
+            c1, c2, c3 = st.columns([1, 1, 1])
+            new_s = c1.number_input("Season", value=int(row['Season']), key=f"s{index}", step=1)
+            new_e = c2.number_input("Episode", value=int(row['Episode']), key=f"e{index}", step=1)
+            
+            # The update button
+            if c3.button("Update Progress", key=f"btn{index}"):
+                df.at[index, 'Season'] = new_s
+                df.at[index, 'Episode'] = new_e
+                conn.update(spreadsheet=SHEET_URL, data=df)
+                st.toast(f"Updated {row['Show Name']}!")
+            
+            # Optional: Add the summary toggle
+            with st.expander("See Summary"):
+                st.write(row['Summary'])
+        
+        st.divider() # Adds a thin line between shows
