@@ -7,7 +7,7 @@ import requests
 # This tells the app: "Go look in the vault for a key called 'token' inside the 'tmdb' section."
 TMDB_TOKEN = st.secrets["tmdb"]["token"]
 HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
-SHEET_URL = st.secrets["connections.gsheets"]["spreadsheet"]
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1LEoZ_C61NQz7HrnGn5uZ5ofpYDNUH0kLAaULVtY1O3I/edit"
 
 st.set_page_config(page_title="BingeTracker Elite", page_icon="📺", layout="wide")
 
