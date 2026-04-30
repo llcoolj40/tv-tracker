@@ -12,7 +12,7 @@ HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
 st.set_page_config(page_title="BingeTracker Elite", page_icon="📺", layout="wide")
 
 # Connect to Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
 
 def get_streaming_service(show_id):
     """Fetches where the show is streaming in the US."""
