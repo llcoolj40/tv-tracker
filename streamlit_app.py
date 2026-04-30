@@ -43,7 +43,7 @@ def fetch_show_data(query):
 st.title("📺 My iPad Watchlist")
 
 # Load data from Google Sheets
-df = conn.read(spreadsheet=SHEET_URL)
+df = conn.read(spreadsheet=SHEET_URL, ttl=0)
 
 # --- SIDEBAR: SEARCH & ADD ---
 with st.sidebar:
