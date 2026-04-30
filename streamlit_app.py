@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 
 # --- CONFIG ---
-TMDB_TOKEN = "YOUR_TMDB_READ_ACCESS_TOKEN"
+TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxNmU4NWRkZmQ5NzUyZDUwM2ExNGZhNTYxYTQyZmFjNiIsIm5iZiI6MTc3Njg5MjA3MS41NzksInN1YiI6IjY5ZTkzOGE3NDJmYmRjNjJiYzBmNGE3ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.3YkaU1hutH9ZYDpJuBumFdajiSbfIZ8jhFpG1rlrFCg"
 HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1LEoZ_C61NQz7HrnGn5uZ5ofpYDNUH0kLAaULVtY1O3I/"
 
