@@ -87,44 +87,56 @@ st.divider()
 if df.empty:
     st.info("Your watchlist is empty! Search for a show in the sidebar to start tracking.")
 else:
-    # Sort alphabetically so the list stays consistent
-    df = df.sort_values("show_name")
+    # --- NEW: FILTER SECTION ---
+    # Create a list of unique services for the dropdown
+    all_services = ["All"] + sorted(df['service'].unique().tolist())
     
-    for index, row in df.iterrows():
-        # Create columns for iPad-friendly horizontal layout
-        col_img, col_info = st.columns([0.6, 4])
-        
-        with col_img:
-            if row['poster']:
-                st.image(row['poster'], width=110)
+    # Place the filter at the top of the main area
+    selected_filter = st.selectbox("Filter by Streaming Service:", all_services)
+
+    # Filter the dataframe based on selection
+    if selected_filter != "All":
+        display_df = df[df['service'] == selected_filter]
+    else:
+        display_df = df
+
+    # Sort alphabetically
+    display_df = display_df.sort_values("show_name")
+    
+    if display_df.empty:
+        st.warning(f"No shows found on {selected_filter}")
+    else:
+        for index, row in display_df.iterrows():
+            # Create columns for iPad-friendly horizontal layout
+            col_img, col_info = st.columns([0.6, 4])
             
-        with col_info:
-            st.subheader(row['show_name'])
-            st.write(f"📍 **Streaming on:** {row['service']}")
-            
-            # Interactive controls for progress
-            c1, c2, c3, c4 = st.columns([1, 1, 1.2, 1])
-            
-            # Number inputs for Season and Episode
-            new_s = c1.number_input("S", value=int(row['season']), key=f"s{index}", step=1)
-            new_e = c2.number_input("E", value=int(row['episode']), key=f"e{index}", step=1)
-            
-            # Update specific row in Supabase
-            if c3.button("Update Progress", key=f"upd{index}"):
-                supabase.table("watchlist").update({
-                    "season": new_s, 
-                    "episode": new_e
-                }).eq("show_name", row['show_name']).execute()
-                st.toast(f"Updated {row['show_name']}!")
-                st.rerun()
+            with col_img:
+                if row['poster']:
+                    st.image(row['poster'], width=110)
                 
-            # Instant Delete from Supabase
-            if c4.button("🗑️ Delete", key=f"del{index}"):
-                supabase.table("watchlist").delete().eq("show_name", row['show_name']).execute()
-                st.rerun()
+            with col_info:
+                st.subheader(row['show_name'])
+                st.write(f"📍 **Streaming on:** {row['service']}")
                 
-            # Expandable summary for clean UI
-            with st.expander("Show Description"):
-                st.write(row['summary'])
-        
-        st.divider()
+                # Interactive controls for progress
+                c1, c2, c3, c4 = st.columns([1, 1, 1.2, 1])
+                
+                new_s = c1.number_input("S", value=int(row['season']), key=f"s{index}", step=1)
+                new_e = c2.number_input("E", value=int(row['episode']), key=f"e{index}", step=1)
+                
+                if c3.button("Update Progress", key=f"upd{index}"):
+                    supabase.table("watchlist").update({
+                        "season": new_s, 
+                        "episode": new_e
+                    }).eq("show_name", row['show_name']).execute()
+                    st.toast(f"Updated {row['show_name']}!")
+                    st.rerun()
+                    
+                if c4.button("🗑️ Delete", key=f"del{index}"):
+                    supabase.table("watchlist").delete().eq("show_name", row['show_name']).execute()
+                    st.rerun()
+                    
+                with st.expander("Show Description"):
+                    st.write(row['summary'])
+            
+            st.divider()
