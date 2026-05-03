@@ -1,112 +1,96 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-import pandas as pd
+from supabase import create_client, Client
 import requests
+import pandas as pd
 
-# --- 1. CONFIG & SECRETS ---
-# Ensure these match what you pasted into the Streamlit Cloud "Secrets" box
+# --- 1. INITIALIZE ---
+URL = st.secrets["supabase"]["url"]
+KEY = st.secrets["supabase"]["key"]
 TMDB_TOKEN = st.secrets["tmdb"]["token"]
-SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
 HEADERS = {"Authorization": f"Bearer {TMDB_TOKEN}"}
 
-st.set_page_config(page_title="BingeTracker Elite", page_icon="📺", layout="wide")
+supabase: Client = create_client(URL, KEY)
 
-# --- 2. GOOGLE SHEETS CONNECTION ---
-# ttl=0 ensures the app always checks for the newest data
-conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
+st.set_page_config(page_title="BingeTracker Pro", page_icon="🚀", layout="wide")
 
-def get_streaming_service(show_id):
-    """Fetches where the show is streaming (US region)."""
-    url = f"https://api.themoviedb.org/3/tv/{show_id}/watch/providers"
-    try:
-        res = requests.get(url, headers=HEADERS).json()
-        results = res.get('results', {}).get('US', {}).get('flatrate', [])
-        return results[0]['provider_name'] if results else "Check App"
-    except:
-        return "Unknown"
+# --- 2. DATA ACTIONS ---
+def load_data():
+    # Supabase returns data instantly, no cache lag!
+    response = supabase.table("watchlist").select("*").execute()
+    return pd.DataFrame(response.data)
 
 def fetch_show_data(query):
-    """Searches TMDB for show details and metadata."""
     url = f"https://api.themoviedb.org/3/search/tv?query={query}"
     res = requests.get(url, headers=HEADERS).json()
     if res.get('results'):
-        top_result = res['results'][0]
-        service = get_streaming_service(top_result['id'])
+        top = res['results'][0]
         return {
-            "name": top_result['name'],
-            "summary": top_result['overview'],
-            "poster": f"https://image.tmdb.org/t/p/w500{top_result['poster_path']}",
-            "service": service
+            "show_name": top['name'],
+            "summary": top['overview'],
+            "poster": f"https://image.tmdb.org/t/p/w500{top['poster_path']}",
+            "service": "Streaming" # You can add the service fetcher here later
         }
     return None
 
 # --- 3. APP UI ---
-st.title("📺 My iPad Watchlist")
+st.title("🚀 BingeTracker Pro")
+df = load_data()
 
-# Load existing data from Google Sheets
-df = conn.read(spreadsheet=SHEET_URL)
-
-# --- 4. SIDEBAR: SEARCH & ADD ---
+# SIDEBAR: SEARCH & ADD
 with st.sidebar:
-    st.header("🔍 Find a New Show")
-    search_query = st.text_input("Type show name...")
-    if search_query:
-        data = fetch_show_data(search_query)
+    st.header("🔍 Add New Show")
+    query = st.text_input("Find a series...")
+    if query:
+        data = fetch_show_data(query)
         if data:
             st.image(data['poster'], width=150)
-            st.write(f"**{data['name']}**")
-            st.caption(f"Streaming: {data['service']}")
             if st.button("Add to My List"):
-                new_row = pd.DataFrame([{
-                    "Show Name": data['name'], 
-                    "Season": 1, 
-                    "Episode": 1,
-                    "Service": data['service'], 
-                    "Summary": data['summary'],
-                    "Poster": data['poster']
-                }])
-                # Combine old data with new row and save to Google Sheets
-                df = pd.concat([df, new_row], ignore_index=True)
-                conn.update(spreadsheet=SHEET_URL, data=df)
-                st.success(f"Added {data['name']}!")
+                # Insert into Supabase
+                supabase.table("watchlist").insert({
+                    "show_name": data['show_name'],
+                    "season": 1,
+                    "episode": 1,
+                    "service": data['service'],
+                    "summary": data['summary'],
+                    "poster": data['poster']
+                }).execute()
+                st.success("Added!")
                 st.rerun()
 
-# --- 5. MAIN VIEW: THE VERTICAL LIST ---
-st.divider()
-
-if df.empty or len(df) == 0:
-    st.info("Your list is empty! Use the sidebar to search for a show.")
-else:
-    # Clean up numbers to prevent decimals/float errors
-    df['Season'] = pd.to_numeric(df['Season']).fillna(1).astype(int)
-    df['Episode'] = pd.to_numeric(df['Episode']).fillna(1).astype(int)
-
-    # Loop through each show - Note the indentation here!
+# MAIN VIEW: THE LIST
+if not df.empty:
+    # Sort alphabetically so it doesn't jump around
+    df = df.sort_values("show_name")
+    
     for index, row in df.iterrows():
-        # Create a narrow column for image and wide column for info
         col_img, col_info = st.columns([0.5, 4])
         
         with col_img:
-            if pd.notna(row['Poster']):
-                st.image(row['Poster'], width=100)
-        
+            st.image(row['poster'], width=100)
+            
         with col_info:
-            st.subheader(row['Show Name'])
-            st.write(f"📍 **Streaming on:** {row['Service']}")
+            st.subheader(row['show_name'])
             
-            # Create a horizontal row for the inputs and button
-            c1, c2, c3 = st.columns([1, 1, 1])
-            new_s = c1.number_input("Season", value=int(row['Season']), key=f"s{index}", step=1)
-            new_e = c2.number_input("Episode", value=int(row['Episode']), key=f"e{index}", step=1)
+            c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+            new_s = c1.number_input("S", value=int(row['season']), key=f"s{index}")
+            new_e = c2.number_input("E", value=int(row['episode']), key=f"e{index}")
             
-            if c3.button("Update Progress", key=f"btn{index}"):
-                df.at[index, 'Season'] = new_s
-                df.at[index, 'Episode'] = new_e
-                conn.update(spreadsheet=SHEET_URL, data=df)
-                st.toast(f"Saved {row['Show Name']}!")
-            
-            # Summary dropdown to keep it clean
-            with st.expander("Show Description"):
-                st.write(row['Summary'])
-        
+            # UPDATE BUTTON
+            if c3.button("Update", key=f"upd{index}"):
+                supabase.table("watchlist").update({
+                    "season": new_s, 
+                    "episode": new_e
+                }).eq("show_name", row['show_name']).execute()
+                st.toast("Saved!")
+                st.rerun()
+                
+            # DELETE BUTTON
+            if c4.button("🗑️ Delete", key=f"del{index}"):
+                supabase.table("watchlist").delete().eq("show_name", row['show_name']).execute()
+                st.rerun()
+                
+            with st.expander("Summary"):
+                st.write(row['summary'])
         st.divider()
+else:
+    st.info("Search and add a show on the left to get started.")
